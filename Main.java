@@ -1,217 +1,175 @@
-import javafx.application.Application;
-import javafx.stage.Stage;
-import javafx.scene.Scene;
-import javafx.scene.layout.VBox;
-import javafx.scene.layout.HBox;
-import javafx.geometry.Pos;
-import javafx.geometry.Insets;
-import javafx.scene.control.Label;
-import javafx.scene.control.Button;
-import javafx.scene.control.ListView;
-import javafx.scene.control.SelectionMode;
-import javafx.collections.ObservableList;
-import javafx.collections.FXCollections;
-import java.util.ArrayList;
-import java.util.Scanner;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Scanner;
 
-/**
-   Shopping Cart
-*/
+public class Main extends JFrame {
+    // ArrayList fields
+    private ArrayList<String> inventoryTitles = new ArrayList<>();
+    private ArrayList<Double> inventoryPrices = new ArrayList<>();
+    private ArrayList<String> cartTitles = new ArrayList<>();
+    private ArrayList<Double> cartPrices = new ArrayList<>();
 
-public class Main extends Application
-{
-   // ArrayList fields
-   private ArrayList<String> inventoryTitles = new ArrayList<>();
-   private ArrayList<Double> inventoryPrices = new ArrayList<>();
-   private ArrayList<String> cartTitles = new ArrayList<>();
-   private ArrayList<Double> cartPrices = new ArrayList<>();
+    private double cartSubtotal = 0.0;
 
-   private double cartSubtotal = 0.0;
+    private JList<String> booksListView;
+    private JList<String> cartListView;
+    private JLabel subtotalOutputLabel;
+    private JLabel taxOutputLabel;
+    private JLabel totalOutputLabel;
 
-   public static void main(String[] args)
-   {
-      // Launch the application.
-      launch(args);
-   }
+    public Main() {
+        // Read book file
+        try {
+            readBookFile();
+        } catch (IOException e) {
+            System.out.println("Error reading the file.");
+        }
 
-   @Override
-   public void start(Stage primaryStage)
-   {
-      // Build the inventory ArrayLists
-      try
-      {
-         readBookFile();
-      }
-      catch (IOException e)
-      {
-         System.out.println("Error reading the file.");
-      }
+        // Initialize GUI components
+        setTitle("Shopping Cart");
+        setLayout(new BorderLayout());
 
-      // Convert the inventoryTtitles ArrayList to an ObservableList.
-      ObservableList<String> strList = FXCollections.observableArrayList(inventoryTitles);
+        // Create inventory list
+        DefaultListModel<String> bookListModel = new DefaultListModel<>();
+        for (String title : inventoryTitles) {
+            bookListModel.addElement(title);
+        }
+        booksListView = new JList<>(bookListModel);
+        JScrollPane bookScrollPane = new JScrollPane(booksListView);
 
-      // Build the Book ListView
-      ListView<String> booksListView = new ListView(strList);
-      Label bookPromptLabel = new Label("Pick a Book");
-      VBox bookVBox = new VBox(10, bookPromptLabel, booksListView);
+        // Create cart list
+        DefaultListModel<String> cartListModel = new DefaultListModel<>();
+        cartListView = new JList<>(cartListModel);
+        JScrollPane cartScrollPane = new JScrollPane(cartListView);
 
-      // Build the Shopping Cart ListView
-      ListView<String> cartListView = new ListView();
-      Label cartPromptLabel = new Label("Shopping Cart");
-      VBox cartVBox = new VBox(10, cartPromptLabel, cartListView);
+        // Create labels for subtotal, tax, and total
+        subtotalOutputLabel = new JLabel("0.00");
+        taxOutputLabel = new JLabel("0.00");
+        totalOutputLabel = new JLabel("0.00");
 
-      // Create the output label for the cart subtotal.
-      Label subtotalDescriptor = new Label("Subtotal:");
-      Label subtotalOutputLabel = new Label("0.00");
-      HBox subtotalHBox = new HBox(10, subtotalDescriptor, subtotalOutputLabel);
-      subtotalHBox.setAlignment(Pos.CENTER);
+        // Create buttons
+        JButton addToCartButton = new JButton("Add To Cart");
+        addToCartButton.addActionListener(new AddToCartListener());
+        
+        JButton removeFromCartButton = new JButton("Remove From Cart");
+        removeFromCartButton.addActionListener(new RemoveFromCartListener());
+        
+        JButton clearCartButton = new JButton("Clear Cart");
+        clearCartButton.addActionListener(new ClearCartListener());
+        
+        JButton checkoutButton = new JButton("Checkout");
+        checkoutButton.addActionListener(new CheckoutListener());
 
-      // Create the output label for the tax.
-      Label taxDescriptor = new Label("Tax:");
-      Label taxOutputLabel = new Label("0.00");
-      HBox taxHBox = new HBox(10, taxDescriptor, taxOutputLabel);
-      taxHBox.setAlignment(Pos.CENTER);
+        // Create panels
+        JPanel bookPanel = new JPanel(new BorderLayout());
+        bookPanel.add(new JLabel("Pick a Book"), BorderLayout.NORTH);
+        bookPanel.add(bookScrollPane, BorderLayout.CENTER);
+        bookPanel.add(addToCartButton, BorderLayout.SOUTH);
 
-      // Create the output label for the cart total.
-      Label totalDescriptor = new Label("Total:");
-      Label totalOutputLabel = new Label("0.00");
-      HBox totalHBox = new HBox(10, totalDescriptor, totalOutputLabel);
-      totalHBox.setAlignment(Pos.CENTER);
+        JPanel cartPanel = new JPanel(new BorderLayout());
+        cartPanel.add(new JLabel("Shopping Cart"), BorderLayout.NORTH);
+        cartPanel.add(cartScrollPane, BorderLayout.CENTER);
+        
+        JPanel cartButtonPanel = new JPanel();
+        cartButtonPanel.setLayout(new BoxLayout(cartButtonPanel, BoxLayout.Y_AXIS));
+        cartButtonPanel.add(removeFromCartButton);
+        cartButtonPanel.add(clearCartButton);
+        cartButtonPanel.add(checkoutButton);
+        
+        cartPanel.add(cartButtonPanel, BorderLayout.SOUTH);
 
-      // Add To Cart Button
-      Button addToCartButton = new Button("Add To Cart");
-      addToCartButton.setOnAction(e ->
-      {
-         // Get the selected index.
-         int index = booksListView.getSelectionModel().getSelectedIndex();
+        // Create subtotal, tax, and total panel
+        JPanel totalsPanel = new JPanel(new GridLayout(3, 2));
+        totalsPanel.add(new JLabel("Subtotal:"));
+        totalsPanel.add(subtotalOutputLabel);
+        totalsPanel.add(new JLabel("Tax:"));
+        totalsPanel.add(taxOutputLabel);
+        totalsPanel.add(new JLabel("Total:"));
+        totalsPanel.add(totalOutputLabel);
 
-         // Add the item to the cart.
-         if (index != -1)
-         {
-            // Update the cart ArrayLists
-            cartTitles.add(inventoryTitles.get(index));
-            cartPrices.add(inventoryPrices.get(index));
+        // Add panels to the main frame
+        add(bookPanel, BorderLayout.WEST);
+        add(cartPanel, BorderLayout.EAST);
+        add(totalsPanel, BorderLayout.SOUTH);
 
-            // Update the cartListView
-            ObservableList<String> tempOList = FXCollections.observableArrayList(cartTitles);
-            cartListView.setItems(tempOList);
+        // Set frame properties
+        setSize(600, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setVisible(true);
+    }
 
-            // Update the subtotal
-            cartSubtotal += inventoryPrices.get(index);
-            subtotalOutputLabel.setText(String.format("%,.2f", cartSubtotal));
-         }
-      });
+    private void readBookFile() throws IOException {
+        Scanner inFile = new Scanner(new File("BookPrices.txt"));
 
-      // Remove From Cart Button
-      Button removeFromCartButton = new Button("Remove From Cart");
-      removeFromCartButton.setOnAction(e ->
-      {
-         // Get the selected index.
-         int index = cartListView.getSelectionModel().getSelectedIndex();
+        while (inFile.hasNext()) {
+            String input = inFile.nextLine();
+            String[] tokens = input.split(",");
+            inventoryTitles.add(tokens[0]);
+            inventoryPrices.add(Double.parseDouble(tokens[1]));
+        }
+        inFile.close();
+    }
 
-         // Add the item to the cart.
-         if (index != -1)
-         {
-            // Update the subtotal
-            cartSubtotal -= cartPrices.get(index);
-            subtotalOutputLabel.setText(String.format("%,.2f", cartSubtotal));
+    private class AddToCartListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            int index = booksListView.getSelectedIndex();
+            if (index != -1) {
+                cartTitles.add(inventoryTitles.get(index));
+                cartPrices.add(inventoryPrices.get(index));
+                updateCartList();
+                cartSubtotal += inventoryPrices.get(index);
+                subtotalOutputLabel.setText(String.format("%,.2f", cartSubtotal));
+            }
+        }
+    }
 
-            // Remove the selected item from the cart ArrayLists
-            cartTitles.remove(index);
-            cartPrices.remove(index);
+    private class RemoveFromCartListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            int index = cartListView.getSelectedIndex();
+            if (index != -1) {
+                cartSubtotal -= cartPrices.get(index);
+                subtotalOutputLabel.setText(String.format("%,.2f", cartSubtotal));
+                cartTitles.remove(index);
+                cartPrices.remove(index);
+                updateCartList();
+            }
+        }
+    }
 
-            // Update the cartListView
-            ObservableList<String> tempOList = FXCollections.observableArrayList(cartTitles);
-            cartListView.setItems(tempOList);
-         }
-      });
+    private class ClearCartListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            cartSubtotal = 0.0;
+            subtotalOutputLabel.setText("0.00");
+            cartTitles.clear();
+            cartPrices.clear();
+            updateCartList();
+        }
+    }
 
-      // Clear Cart Button
-      Button clearCartButton = new Button("Clear Cart");
-      clearCartButton.setOnAction(e ->
-      {
-         // Update the subtotal
-         cartSubtotal = 0.0;
-         subtotalOutputLabel.setText("0.00");
+    private class CheckoutListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            final double TAX_RATE = 0.07;
+            double tax = cartSubtotal * TAX_RATE;
+            taxOutputLabel.setText(String.format("%,.2f", tax));
+            double total = cartSubtotal + tax;
+            totalOutputLabel.setText(String.format("%,.2f", total));
+        }
+    }
 
-         // Clear the cart ArrayLists
-         cartTitles.clear();
-         cartPrices.clear();
+    private void updateCartList() {
+        DefaultListModel<String> cartListModel = new DefaultListModel<>();
+        for (String title : cartTitles) {
+            cartListModel.addElement(title);
+        }
+        cartListView.setModel(cartListModel);
+    }
 
-         // Update the cartListView
-         ObservableList<String> tempOList = FXCollections.observableArrayList(cartTitles);
-         cartListView.setItems(tempOList);
-      });
-
-      // Checkout Button
-      Button checkoutButton = new Button("Checkout");
-      checkoutButton.setOnAction(e ->
-      {
-         final double TAX_RATE = 0.07;
-
-         // Calculate the tax
-         double tax = cartSubtotal * TAX_RATE;
-         taxOutputLabel.setText(String.format("%,.2f", tax));
-
-         // Calculate the total
-         double total = cartSubtotal + tax;
-         totalOutputLabel.setText(String.format("%,.2f", total));
-      });
-
-      // Build the VBox to hold the Add button
-      VBox addButtonVBox = new VBox(10, addToCartButton);
-      addButtonVBox.setAlignment(Pos.CENTER);
-
-      // Build the VBox to hold the cart buttons
-      VBox cartButtonsVBox = new VBox(10, removeFromCartButton, 
-                                          clearCartButton, 
-                                          checkoutButton);
-      cartButtonsVBox.setAlignment(Pos.CENTER);
-
-      // Build the top part of the GUI
-      HBox topHBox = new HBox(10, bookVBox, addButtonVBox, cartVBox, cartButtonsVBox);
-
-      // Build the bottom part of the GUI
-      HBox bottomHBox = new HBox(10, subtotalHBox, taxHBox, totalHBox);
-
-      // Put everything into a VBox
-      VBox mainVBox = new VBox(10, topHBox, bottomHBox);
-      mainVBox.setAlignment(Pos.CENTER);
-      mainVBox.setPadding(new Insets(10));
-
-      // Add the main VBox to a scene.
-      Scene scene = new Scene(mainVBox);
-
-      // Set the scene to the stage aand display it.
-      primaryStage.setScene(scene);
-      primaryStage.show();
-   }
-
-   private void readBookFile() throws IOException
-   {
-      String input;  // To hold a line from the file
-
-      // Open the file.
-      File file = new File("BookPrices.txt");
-      Scanner inFile = new Scanner(file);
-
-      // Read the file.
-      while (inFile.hasNext())
-      {
-         // Read a line.
-         input = inFile.nextLine();
-
-         // Tokenize the line.
-         String[] tokens = input.split(",");
-
-         // Add the book info to the ArrayLists.
-         inventoryTitles.add(tokens[0]);
-         inventoryPrices.add(Double.parseDouble(tokens[1]));
-      }
-
-      // Close the file.
-      inFile.close();
-   }
+    public static void main(String[] args) {
+        new Main();
+    }
 }
